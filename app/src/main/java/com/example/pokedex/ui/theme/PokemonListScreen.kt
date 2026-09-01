@@ -10,47 +10,50 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 
+@Preview
 @Composable
-fun PokemonListScreen(){
-    var pokemonList by remember { mutableStateOf<List<PokemonsResults>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var errorMessage by remember { mutableStateOf<String?>(null)}
+fun PokemonListScreen(
+    viewModel: PokemonListViewModel = viewModel()
+) {
+    val uiState by viewModel.state.collectAsState()
 
     LaunchedEffect(Unit) {
-        try {
-            val response = PokeApiInstance.api.getPokemonList()
-            pokemonList = response.results
-        } catch (e: Exception) {
-            errorMessage = "Falha ao carregar Pokémons: ${e.localizedMessage}"
-        } finally {
-            isLoading = false
-        }
+        viewModel.processIntent(PokemonListIntent.LoadPokemons)
     }
 
+    PokemonListContent(uiState = uiState)
+}
+
+@Composable
+fun PokemonListContent(
+    uiState: PokemonListUiState
+) {
     Box(modifier = Modifier.fillMaxSize()) {
-        when {
-            isLoading -> {
+        when (uiState) {
+            is PokemonListUiState.Loading -> {
                 CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center)
                 )
             }
-            errorMessage != null -> {
+            is PokemonListUiState.Error -> {
                 Text(
-                    text = errorMessage ?: "Erro Desconhecido",
-                    modifier = Modifier.align(Alignment.Center).padding(16.dp)
+                    text = uiState.message,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(16.dp)
                 )
             }
-            else -> {
+            is PokemonListUiState.Success -> {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(pokemonList) { pokemon ->
+                    items(uiState.pokemons) { pokemon ->
                         PokemonItemRow(pokemon = pokemon)
                     }
                 }
@@ -60,11 +63,27 @@ fun PokemonListScreen(){
 }
 
 @Composable
-fun PokemonItemRow(pokemon: PokemonsResults){
+fun PokemonItemRow(pokemon: PokemonsResults) {
     Text(
         text = pokemon.pokemonName.replaceFirstChar { it.uppercase() },
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
     )
+}
+
+@Preview(showBackground = true)
+@Composable
+fun PokemonListContentPreview() {
+    PokedexTheme {
+        PokemonListContent(
+            uiState = PokemonListUiState.Success(
+                pokemons = listOf(
+                    PokemonsResults("bulbasaur"),
+                    PokemonsResults("ivysaur"),
+                    PokemonsResults("venusaur")
+                )
+            )
+        )
+    }
 }
